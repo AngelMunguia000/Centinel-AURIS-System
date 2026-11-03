@@ -36,7 +36,7 @@ Centinel no suena todo el tiempo ni hacia todos lados. Hace cuatro cosas:
 ## Cómo funciona
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph N2["ESP32-S3 · ejecuta"]
         CAM[Cámara OV3660]
         TOR[Torreta pan-tilt]
