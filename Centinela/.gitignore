@@ -1,0 +1,74 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+/lib/generated/prisma
+
+# Prisma
+prisma/*.db
+
+# Entornos virtuales ajenos al proyecto (Next.js/TypeScript, sin código Python)
+.venv/
+
+# Sandbox de Prototypes/vision: modelos y assets binarios grandes, no versionar
+Prototypes/vision/models/
+Prototypes/vision/samples/
+Prototypes/vision/output/
+
+prisma/_backups/
+/_backups/
+
+
+# Salida de depuración de Playwright CLI (snapshots/consola de sesiones de
+# navegador) — descartable, no es código del producto ni documentación.
+.playwright-cli/
+
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Credenciales locales de desarrollo — nunca a git
+/credenciales-dev.txt
+
+# Enlace edge (Python / PlatformIO)
+/edge/pi-gateway/.env
+/edge/pi-gateway/.venv/
+/edge/pi-gateway/*.db
+__pycache__/
+.pytest_cache/
+/edge/esp32-node/include/config.h
+/edge/esp32-node/.pio/
+/edge/esp32-node/.venv/
+
+# Centinela Desktop: el ZIP lo genera Projects/Centinela-Desktop/build.ps1 (no va al repo)
+/public/descargas/
+
+# Fotos de evidencia de las cámaras (lib/edge/evidencia.ts)
+/storage/

@@ -1,0 +1,49 @@
+/* Asegura que las transformaciones se hagan desde el centro de cada figura */
+.logo-svg circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* --- ANIMACIONES --- */
+
+/* Animación de latido para el núcleo rojo */
+.logo-svg.animated .core-red {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+/* Animación de respiración para los anillos internos */
+.logo-svg.animated .ring-inner-black {
+  animation: breathe 4s infinite ease-in-out;
+}
+
+/* Efecto al pasar el cursor (Hover) */
+.logo-svg:hover .core-red {
+  fill: #e0566c;
+  transform: scale(1.2);
+}
+
+.logo-svg:hover .ring-outer-white {
+  transform: scale(1.03);
+}
+
+/* Definición de Keyframes */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}

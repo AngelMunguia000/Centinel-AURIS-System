@@ -1,0 +1,8 @@
+# Dependencias directas (versiones probadas el 2026-10-23). Instalar: .venv\Scripts\pip install -r requirements.txt
+PySide6==6.8.1
+httpx==0.28.1
+pyinstaller==6.22.3
+
+# Pruebas
+pytest==9.1.1
+respx==0.23.1

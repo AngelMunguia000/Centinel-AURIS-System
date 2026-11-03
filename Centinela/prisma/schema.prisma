@@ -1,0 +1,360 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// Prisma schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id              Int      @id @default(autoincrement())
+  username        String?  @unique
+  nombre          String
+  apellido        String
+  email           String   @unique
+  telefono        String
+  password        String?
+  passwordResetTokenHash    String?
+  passwordResetTokenExpires DateTime?
+  rolId           Int
+  rol             Rol      @relation(fields: [rolId], references: [id])
+  createdAt       DateTime @default(now())
+  ultimoLogin     DateTime?
+  // Verificación en dos pasos (lib/totp.ts). Secretos cifrados; respaldo = JSON de hashes sha256.
+  totpSecreto     String?
+  totpPendiente   String?   // generado al iniciar la activación, hasta confirmarlo con un código
+  totpActivadoEn  DateTime?
+  codigosRespaldo String?
+  // Resumen semanal por correo (lib/resumen-semanal.ts): activado por defecto; semana ISO del último envío.
+  resumenSemanal       Boolean @default(true)
+  resumenEnviadoSemana String?
+  reportes        Reporte[] @relation("ReporteCreador")
+  reportesResueltos Reporte[] @relation("ReporteResolutor")
+  reportesAsignados Reporte[] @relation("ReporteAsignado")
+  reportesAtendidos Reporte[] @relation("ReporteAtendido")
+  sesiones        Sesion[]
+  dispositivos    Dispositivo[]
+  comentarios     Comentario[]
+  notificaciones  Notificacion[]
+  historialReportes HistorialReporte[]
+  permisosCuenta  PermisoCuenta[]
+  gateways        Gateway[]
+}
+
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  usuarios Usuario[]
+}
+
+model Reporte {
+  id            Int      @id @default(autoincrement())
+  titulo        String
+  descripcion   String
+  estado        String   @default("pendiente")
+  // 15§4.2, 16§4.2: Prioridad y Categoría, Value Objects de Incidencia (Etapa de Profundización).
+  // Catálogos adoptados por decisión del Product Owner en la Fase 20 (sin evidencia previa en Brain/11–21):
+  // prioridad: baja | media | alta | critica — categoria: Hardware | Software | Seguridad | Cuenta (ejemplo de Brain/04_Database.md, promovido a decisión formal).
+  prioridad     String   @default("media")
+  categoria     String?
+  usuarioId     Int
+  usuario       Usuario  @relation("ReporteCreador", fields: [usuarioId], references: [id])
+  // 18§6.3: Cuenta (Operador/Admin) — resuelve — Incidencia, 1:N opcional.
+  resueltoPorId Int?
+  resueltoPor   Usuario? @relation("ReporteResolutor", fields: [resueltoPorId], references: [id])
+  // 06_UI_UX.md §E (2026-09-18): Admin asigna la Incidencia a un Operador
+  // específico. Aditivo — no restringe la visibilidad existente de la cola
+  // (cualquier Operador sigue viendo todos los reportes), solo agrega el dato
+  // y un filtro "asignados a mí" en la cola. Null = sin asignar.
+  operadorAsignadoId Int?
+  operadorAsignado   Usuario? @relation("ReporteAsignado", fields: [operadorAsignadoId], references: [id])
+  // Respuesta a alarmas (roadmap de funciones, 2026-10-24): acuse de recibo,
+  // cierre con motivo y escalamiento si nadie acusa a tiempo (lib/respuesta.ts).
+  atendidoEn    DateTime?
+  atendidoPorId Int?
+  atendidoPor   Usuario? @relation("ReporteAtendido", fields: [atendidoPorId], references: [id])
+  resueltoEn    DateTime?
+  motivoCierre  String?  // "real" | "falsa_alarma" | "prueba"
+  escaladoEn    DateTime?
+  // Evento del nodo que abrió la incidencia (lib/edge/ingesta.ts): de ahí sale la foto de evidencia.
+  eventoId      String?
+  evento        EventoDispositivo? @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  comentarios   Comentario[]
+  notificaciones Notificacion[]
+  historial     HistorialReporte[]
+
+  // AUD2-10 (auditoría integral 26 ago): usuarioId y estado se filtran en cada
+  // carga de dashboard/cola de Operador; createdAt se ordena en cada listado.
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([createdAt])
+  @@index([operadorAsignadoId])
+  @@index([resueltoEn])
+}
+
+// 06_UI_UX.md §C (2026-09-18): intercambio de información entre quien reporta
+// y quien atiende (15§4.2 roadmap). Sin edición ni borrado por ahora — solo
+// crear y listar, como el resto de Acciones de este dominio.
+model Comentario {
+  id        Int      @id @default(autoincrement())
+  contenido String
+  reporteId Int
+  reporte   Reporte  @relation(fields: [reporteId], references: [id])
+  autorId   Int
+  autor     Usuario  @relation(fields: [autorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([reporteId])
+}
+
+// 06_UI_UX.md §G (2026-09-18, alcance decidido por el PO): solo Operador,
+// solo in-app, solo al asignarle un reporte. Sin WebSockets en el proyecto —
+// se consulta al cargar/enfocar la página, igual que el resto del sistema
+// (ver OperadorAlertaModal.tsx para el precedente de aviso sin infraestructura
+// nueva). reporteId es opcional a nivel de esquema por si en el futuro hay
+// notificaciones sin un Reporte asociado, aunque esta primera Acción siempre lo trae.
+model Notificacion {
+  id             Int      @id @default(autoincrement())
+  destinatarioId Int
+  destinatario   Usuario  @relation(fields: [destinatarioId], references: [id])
+  mensaje        String
+  reporteId      Int?
+  reporte        Reporte? @relation(fields: [reporteId], references: [id])
+  leida          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([destinatarioId])
+  @@index([destinatarioId, leida])
+  @@index([createdAt])
+}
+
+// 06_UI_UX.md §B (2026-09-18): historial completo de cambios de una
+// incidencia (15§4.2 roadmap), no solo su estado actual. Un registro por
+// campo que realmente cambió en cada PATCH — no un snapshot completo del
+// Reporte, para no duplicar datos que ya viven en Reporte/Comentario.
+model HistorialReporte {
+  id            Int      @id @default(autoincrement())
+  reporteId     Int
+  reporte       Reporte  @relation(fields: [reporteId], references: [id])
+  autorId       Int
+  autor         Usuario  @relation(fields: [autorId], references: [id])
+  campo         String   // "estado" | "prioridad" | "categoria" | "operadorAsignado"
+  valorAnterior String?
+  valorNuevo    String?
+  createdAt     DateTime @default(now())
+
+  @@index([reporteId])
+}
+
+// 06_UI_UX.md §J (2026-09-21): trazabilidad a nivel cuentas/roles (15§4.7
+// roadmap) — quién cambió el rol de quién, y quién eliminó qué cuenta.
+// A propósito SIN llaves foráneas a Usuario: la acción "cuenta_eliminada"
+// borra al objetivo, y una FK bloquearía ese DELETE (o perdería el registro
+// justo cuando más importa). Se guardan id + email como copia, así el
+// registro sobrevive aunque cualquiera de las dos cuentas ya no exista.
+model AuditoriaCuenta {
+  id            Int      @id @default(autoincrement())
+  accion        String   // "cambio_rol" | "cuenta_eliminada" | "permiso_cambiado"
+  adminId       Int
+  adminEmail    String
+  objetivoId    Int
+  objetivoEmail String
+  valorAnterior String?  // nombre del rol antes; en permiso_cambiado: "<clave>: <estado>"
+  valorNuevo    String?  // nombre del rol después (null en cuenta_eliminada); en permiso_cambiado: "<clave>: <estado>"
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// 06_UI_UX.md §F (2026-09-24): excepciones de permisos por cuenta sobre los
+// defaults de su rol (lib/permisos.ts). Solo se guardan diferencias reales:
+// otorgado=true suma un permiso que el rol no trae, false quita uno que sí.
+// Nunca aplica a cuentas Admin. Se borran al cambiar el rol de la cuenta.
+model PermisoCuenta {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permiso   String
+  otorgado  Boolean
+  createdAt DateTime @default(now())
+
+  @@unique([usuarioId, permiso])
+}
+
+// Centro de Dispositivos (2 sep 2026): el "equipo" de seguridad de un Usuario
+// individual (cámaras, sensores, biométricos, etc.) — cada Usuario tiene el
+// suyo. variableLabel/variableValor son una única métrica extra específica
+// del tipo de dispositivo (latencia, integridad, flujo, señal, temperatura),
+// no un array — así de simple es el modelo hoy, sin telemetría real todavía.
+model Dispositivo {
+  id            Int      @id @default(autoincrement())
+  nombre        String
+  uid           String   @unique
+  tipo          String
+  conexion      String   @default("ESTABLE")
+  bateria       Int?
+  variableLabel String?
+  variableValor String?
+  usuarioId     Int
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt     DateTime @default(now())
+  // Enlace edge (spec 2026-10-16-enlace-edge-design.md §5): solo los nodos
+  // que reporta una Raspberry Pi llenan estos campos; los manuales no cambian.
+  gatewayId      Int?
+  gateway        Gateway?  @relation(fields: [gatewayId], references: [id])
+  nodeId         String?   @unique
+  capacidades    String?
+  // Última telemetría recibida (JSON del contrato §4.1), para snapshot y servo.
+  telemetria     String?
+  telemetriaMinutos TelemetriaMinuto[]
+  disuasiones       Disuasion[]
+  telemetriaHoras   TelemetriaHora[]
+  firmware       String?
+  ultimoContacto DateTime?
+  eventos        EventoDispositivo[]
+
+  @@index([usuarioId])
+  @@index([gatewayId])
+}
+
+model Gateway {
+  id             Int       @id @default(autoincrement())
+  nombre         String
+  usuarioId      Int
+  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  // SHA-256 hex del token; el token en claro solo se muestra al vincular.
+  tokenHash      String    @unique
+  urlBase        String
+  revocadoEn     DateTime?
+  ultimoContacto DateTime?
+  // Cuándo se avisó que la Pi dejó de responder; null = no hay aviso pendiente.
+  avisoSinContactoEn DateTime?
+  // Armado por lugar (roadmap de funciones #4, lib/edge/armado.ts). Desarmado: los eventos
+  // se guardan pero no abren reporte ni avisan, y la Pi no disuade.
+  modoArmado         String    @default("armado") // "armado" | "desarmado" | "horario"
+  horarioArmado      String?   // JSON {dias:[0-6], desde:"HH:MM", hasta:"HH:MM"}, armado dentro de la ventana
+  vacacionesHasta    DateTime? // armado sin importar el modo hasta esta fecha
+  armadoCambiadoPor  String?
+  armadoCambiadoEn   DateTime?
+  createdAt      DateTime  @default(now())
+  dispositivos   Dispositivo[]
+
+  @@index([usuarioId])
+}
+
+model EventoDispositivo {
+  // uuid generado en la Pi: reenviar el mismo evento no lo duplica.
+  id            String      @id
+  dispositivoId Int
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  tipo          String
+  severidad     String
+  detalle       String?
+  ocurridoEn    DateTime
+  recibidoEn    DateTime    @default(now())
+  // Foto de la cámara del nodo (lib/edge/evidencia.ts): nombre del archivo en storage/evidencias.
+  evidencia     String?
+  // Revisión humana de la foto (lib/edge/revision.ts): "objetivo" (había un ave) | "nada". Null = sin revisar.
+  revision      String?
+  reportes      Reporte[]
+
+  @@index([dispositivoId, ocurridoEn])
+  // Conteos del resumen semanal y la Bitácora por fecha, tipo y severidad (actualización de base 2026-10-25).
+  @@index([ocurridoEn])
+  @@index([tipo, ocurridoEn])
+}
+
+// Auditoría de cada comando web → Pi.
+model ComandoDispositivo {
+  id            String   @id
+  dispositivoId Int
+  usuarioId     Int
+  tipo          String
+  payload       String
+  estado        String
+  latenciaMs    Int?
+  createdAt     DateTime @default(now())
+
+  @@index([dispositivoId, createdAt])
+}
+// Sesiones activas (roadmap de funciones #8, lib/sesiones.ts): el JWT lleva el id de su
+// sesión y cada request la revisa, así se puede ver dónde hay sesión abierta y cerrarla
+// a distancia. Se borran con la cuenta.
+model Sesion {
+  id              String    @id // uuid, va en el JWT como `sid`
+  usuarioId       Int
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  agente          String?   // user-agent recortado
+  ip              String?
+  via             String    // "password" | "oauth"
+  creadaEn        DateTime  @default(now())
+  ultimaActividad DateTime  @default(now())
+  expiraEn        DateTime
+  revocadaEn      DateTime?
+
+  @@index([usuarioId])
+}
+
+// Historial de telemetría (Sessions/Centinela_2026-10-25_actualizacion_base.md, fase 2). La Pi manda una
+// muestra cada 2 s; la web las agrega (lib/edge/historial.ts) y guarda una fila por minuto (30 días) y
+// otra por hora (1 año). Sumas en vez de promedios: combinar minutos en horas es sumar.
+model TelemetriaMinuto {
+  dispositivoId Int
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  inicio        DateTime
+  muestras      Int
+  tempSuma      Float
+  tempMin       Float
+  tempMax       Float
+  rssiSuma      Float
+  rssiMin       Float
+  heapMin       Int
+
+  @@id([dispositivoId, inicio])
+  @@index([inicio])
+}
+
+model TelemetriaHora {
+  dispositivoId Int
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  inicio        DateTime
+  muestras      Int
+  tempSuma      Float
+  tempMin       Float
+  tempMax       Float
+  rssiSuma      Float
+  rssiMin       Float
+  heapMin       Int
+
+  @@id([dispositivoId, inicio])
+  @@index([inicio])
+}
+
+// Cada decisión de disuasión de la Pi y su resultado (actualización de base 2026-10-25, fase 3). Base del
+// roadmap #11: saber qué patrón espanta mejor, por nodo y por hora. id = id del evento "disuasion".
+model Disuasion {
+  id            String      @id
+  dispositivoId Int
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id], onDelete: Cascade)
+  ocurridoEn    DateTime
+  ejecutada     Boolean
+  motivo        String?     // por qué no se ejecutó (desarmado, enfriamiento, límite, broker)
+  patron        String?
+  duracionMs    Int?
+  ganancia      Float?
+  exito         Boolean?    // null = aún sin medir o no aplica
+  medidoEn      DateTime?
+
+  @@index([dispositivoId, ocurridoEn])
+  @@index([patron])
+}

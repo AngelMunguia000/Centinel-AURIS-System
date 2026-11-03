@@ -1,0 +1,122 @@
+/* Estilos del Contenedor de Carga */
+.loaderContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background-color: #0d0d0d; /* Fondo oscuro por defecto */
+}
+
+/* Modo Pantalla Completa */
+/* Agrega estos cambios a tu Loader.module.css */
+
+.fullScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  /* Transición suave para cuando la web termine de cargar */
+  transition: opacity 0.6s ease-in-out, visibility 0.6s ease-in-out;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Clase que se activa cuando la web ya cargó */
+.fadeOut {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Texto Opcional de Carga */
+.loaderText {
+  margin-top: 1.5rem;
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  animation: pulseText 2s infinite ease-in-out;
+}
+
+/* --- ANIMACIÓN POP DE LOS CÍRCULOS DEL LOGO --- */
+
+.loaderLogo circle {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation-duration: 2.8s;
+  animation-iteration-count: infinite;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); /* Curva elástica para el efecto "POP" */
+}
+
+/* 
+  Seleccionamos cada círculo secuencialmente del 1 al 5:
+  1: Círculo Exterior Blanco (Anima primero en abrir, último en cerrar)
+  2: Anillo Exterior Negro
+  3: Anillo Interior Blanco
+  4: Fondo Negro del Núcleo
+  5: Núcleo Rojo (Anima último en abrir, primero en cerrar)
+*/
+
+.loaderLogo circle:nth-child(1) { animation-name: popRing1; }
+.loaderLogo circle:nth-child(2) { animation-name: popRing2; }
+.loaderLogo circle:nth-child(3) { animation-name: popRing3; }
+.loaderLogo circle:nth-child(4) { animation-name: popRing4; }
+.loaderLogo circle:nth-child(5) { animation-name: popRing5; }
+
+/* 
+   KEYFRAMES: 
+   Fase 1 (0% a 45%): Aparecen de AFUERA hacia ADENTRO (1 -> 2 -> 3 -> 4 -> 5)
+   Fase 2 (55% a 100%): Desaparecen de ADENTRO hacia AFUERA (5 -> 4 -> 3 -> 2 -> 1)
+*/
+
+/* 1. Anillo Blanco Exterior */
+@keyframes popRing1 {
+  0% { transform: scale(0); opacity: 0; }
+  12% { transform: scale(1); opacity: 1; }
+  80% { transform: scale(1); opacity: 1; }
+  92%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* 2. Anillo Negro Exterior */
+@keyframes popRing2 {
+  0%, 6% { transform: scale(0); opacity: 0; }
+  18% { transform: scale(1); opacity: 1; }
+  74% { transform: scale(1); opacity: 1; }
+  86%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* 3. Anillo Blanco Interior */
+@keyframes popRing3 {
+  0%, 12% { transform: scale(0); opacity: 0; }
+  24% { transform: scale(1); opacity: 1; }
+  68% { transform: scale(1); opacity: 1; }
+  80%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* 4. Núcleo Negro */
+@keyframes popRing4 {
+  0%, 18% { transform: scale(0); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+  62% { transform: scale(1); opacity: 1; }
+  74%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* 5. Núcleo Rojo (Centro) */
+@keyframes popRing5 {
+  0%, 24% { transform: scale(0); opacity: 0; }
+  36% { transform: scale(1.2); opacity: 1; } /* Rebote pop extra al centro */
+  42% { transform: scale(1); opacity: 1; }
+  56% { transform: scale(1); opacity: 1; }
+  68%, 100% { transform: scale(0); opacity: 0; }
+}
+
+/* Animación sutil para el texto */
+@keyframes pulseText {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.9; }
+}
